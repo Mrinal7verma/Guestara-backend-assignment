@@ -2,7 +2,6 @@ const Item = require('../models/Item');
 const Category = require('../models/Category');
 const SubCategory = require('../models/SubCategory');
 
-// --- HELPER: CALCULATE PRICE BASED ON TYPE ---
 const calculateBasePrice = (item, requestTime) => {
   const config = item.priceConfiguration;
 
@@ -15,16 +14,11 @@ const calculateBasePrice = (item, requestTime) => {
       if (config.discountType === 'percentage') {
         return base - (base * config.discountValue) / 100;
       } else {
-        // Flat discount
         return Math.max(0, base - config.discountValue);
       }
 
     case 'dynamic':
-      // Find the slot that matches the current time (or requested time)
-      // We assume time is stored as "HH:mm" strings like "08:00"
       const currentHour = requestTime.getHours();
-      // Simple logic: Check if current hour is within a slot
-      // (For a real production app, we would parse minutes carefully)
       const matchedSlot = config.timeSlots.find((slot) => {
         const startH = parseInt(slot.startTime.split(':')[0]);
         const endH = parseInt(slot.endTime.split(':')[0]);
@@ -47,7 +41,6 @@ const calculateBasePrice = (item, requestTime) => {
 // 1. Create Item
 exports.createItem = async (req, res) => {
   try {
-    // We added is_bookable, available_days, available_slots to this line:
     const {
       name,
       image,
@@ -84,7 +77,6 @@ exports.createItem = async (req, res) => {
       is_active,
       priceType,
       priceConfiguration,
-      // We added these 3 lines so they get saved to the DB:
       is_bookable,
       available_days,
       available_slots,
@@ -108,28 +100,25 @@ exports.getItems = async (req, res) => {
   }
 };
 
-// 3. Get Item Price (The "Brain")
+// 3. Get Item Price
 exports.getItemPrice = async (req, res) => {
   try {
     const { id } = req.params;
-
-    // Find item and populate parents
     const item = await Item.findById(id)
       .populate('category')
       .populate('subCategory');
 
     if (!item) return res.status(404).json({ message: 'Item not found' });
 
-    // 1. Calculate Base Price using our Helper
+    // 1. Calculate Base Prie
     let finalPrice = 0;
     try {
-      // We pass "new Date()" to handle dynamic time-based pricing
       finalPrice = calculateBasePrice(item, new Date());
     } catch (err) {
       return res.status(400).json({ message: err.message });
     }
 
-    // 2. TAX INHERITANCE LOGIC
+    // 2. TAX LOGICC
     let taxPercentage = 0;
     if (item.tax !== null && item.tax !== undefined) {
       taxPercentage = item.tax;
@@ -163,19 +152,17 @@ exports.getItemPrice = async (req, res) => {
 exports.checkAvailability = async (req, res) => {
   try {
     const { id } = req.params;
-    const { requestDate } = req.body; // Expects "2026-01-20T10:00:00"
+    const { requestDate } = req.body;
 
     const item = await Item.findById(id);
     if (!item) return res.status(404).json({ message: 'Item not found' });
 
-    // If item is not active, it's never available
     if (!item.is_active) {
       return res
         .status(200)
         .json({ available: false, reason: 'Item is inactive' });
     }
 
-    // If not bookable, assume it's always available (like standard menu items)
     if (!item.is_bookable) {
       return res
         .status(200)
@@ -184,7 +171,7 @@ exports.checkAvailability = async (req, res) => {
 
     const date = new Date(requestDate);
 
-    // 1. Check Day of Week (0=Sun, 1=Mon, ..., 6=Sat)
+    // 1. Check Day of Week
     const daysMap = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const requestDay = daysMap[date.getDay()];
 
@@ -198,7 +185,6 @@ exports.checkAvailability = async (req, res) => {
     }
 
     // 2. Check Time Slots
-    // Convert request time to "HH:mm" (e.g., "14:30")
     const requestTime = date.toTimeString().slice(0, 5);
     const requestHour = parseInt(requestTime.split(':')[0]);
     const requestMin = parseInt(requestTime.split(':')[1]);
@@ -207,8 +193,6 @@ exports.checkAvailability = async (req, res) => {
       const isWithinSlot = item.available_slots.some((slot) => {
         const [startH, startM] = slot.startTime.split(':').map(Number);
         const [endH, endM] = slot.endTime.split(':').map(Number);
-
-        // Simple check: Convert everything to minutes for easier comparison
         const reqMinutes = requestHour * 60 + requestMin;
         const startMinutes = startH * 60 + startM;
         const endMinutes = endH * 60 + endM;
@@ -234,7 +218,6 @@ exports.checkAvailability = async (req, res) => {
 exports.searchItems = async (req, res) => {
   try {
     const { name } = req.query;
-    // 'i' means case-insensitive (matches "coffee", "Coffee", "COFFEE")
     const items = await Item.find({ name: { $regex: name, $options: 'i' } });
     res.status(200).json({ success: true, count: items.length, data: items });
   } catch (error) {

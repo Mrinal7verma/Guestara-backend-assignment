@@ -3,7 +3,7 @@ const dotenv = require('dotenv');
 dotenv.config();
 const connectDB = require('./src/config/db');
 
-// --- Import Routes ---
+// import routes
 const categoryRoutes = require('./src/routes/categoryRoutes');
 const subCategoryRoutes = require('./src/routes/subCategoryRoutes');
 const itemRoutes = require('./src/routes/itemRoutes');
@@ -16,7 +16,7 @@ connectDB();
 
 app.use(express.json());
 
-// --- Use Routes ---
+// use routes
 app.use('/api/categories', categoryRoutes);
 app.use('/api/subcategories', subCategoryRoutes);
 app.use('/api/items', itemRoutes);
